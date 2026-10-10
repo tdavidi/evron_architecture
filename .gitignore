@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 deliverables/preview/
 .DS_Store
+private/
