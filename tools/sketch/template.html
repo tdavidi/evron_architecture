@@ -1,0 +1,581 @@
+<title>לוח סקיצות לבית</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap">
+<style>
+/* Layout: one screen. A thin bar for the drafts and versions, the drawing board under it, panels slide over it. */
+:root {
+  --bg: #f3f4f1; --surface: #ffffff; --ink: #1d1f1c; --muted: #646a63; --line: #d6d9d2;
+  --accent: #2f5d9b; --accent-ink: #ffffff; --danger: #b23b35; --ok: #3d7a4a;
+  --font: "Assistant", "Segoe UI", "Arial Hebrew", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1b1d1b; --surface: #242724; --ink: #ecefe9; --muted: #a2a99f; --line: #3a3f39;
+  --accent: #7fa7de; --accent-ink: #10213a; --danger: #e2766f; --ok: #79c08a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #1b1d1b; --surface: #242724; --ink: #ecefe9; --muted: #a2a99f; --line: #3a3f39;
+  --accent: #7fa7de; --accent-ink: #10213a; --danger: #e2766f; --ok: #79c08a; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 15px; }
+#app { height: 100%; display: flex; flex-direction: column; direction: rtl; }
+.bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 8px;
+  padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar select { flex: 1 1 140px; min-width: 0; max-width: 320px; }
+select, input, textarea, button { font: inherit; color: inherit; }
+select, input[type=text], textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; }
+button { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 12px; cursor: pointer; white-space: nowrap; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button.danger { color: var(--danger); border-color: var(--danger); }
+button:disabled { opacity: .5; cursor: default; }
+#status { font-size: 13px; color: var(--muted); margin-inline-start: auto; }
+#status.err { color: var(--danger); }
+#board { position: relative; flex: 1; min-height: 0; }
+#canvas { position: absolute; inset: 0; }
+#measure { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); z-index: 5; pointer-events: none;
+  background: var(--ink); color: var(--bg); border-radius: 14px; padding: 3px 12px; font-size: 14px; font-weight: 600;
+  font-variant-numeric: tabular-nums; direction: rtl; white-space: nowrap; }
+#empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: var(--muted); padding: 24px; }
+/* side panel and sheets */
+.panel { position: absolute; top: 0; bottom: 0; right: 0; width: min(360px, 100%); z-index: 20; overflow-y: auto;
+  background: var(--surface); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.12);
+  padding: 16px max(16px, env(safe-area-inset-right, 0px)) 24px 16px; display: flex; flex-direction: column; gap: 18px; }
+.panel h2 { font-size: 13px; letter-spacing: .04em; color: var(--muted); margin: 0 0 6px; font-weight: 600; }
+.panel section { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.row > input[type=text] { flex: 1; min-width: 0; }
+.vlist { display: flex; flex-direction: column; gap: 6px; }
+.ver { display: grid; grid-template-columns: 56px 1fr auto; gap: 8px; align-items: center; border: 1px solid var(--line);
+  border-radius: 8px; padding: 6px; }
+.ver img { width: 56px; height: 56px; object-fit: contain; background: #fff; border-radius: 4px; }
+.ver .t { min-width: 0; font-size: 13px; }
+.ver .t b { font-size: 14px; }
+.ver .t div { color: var(--muted); overflow-wrap: anywhere; }
+.help { font-size: 14px; line-height: 1.55; color: var(--ink); margin: 0; padding-inline-start: 18px; }
+.help li { margin-bottom: 4px; }
+.shade { position: absolute; inset: 0; z-index: 30; background: rgba(0,0,0,.35); display: grid; place-items: center; padding: 16px; }
+.sheet { background: var(--surface); border-radius: 12px; padding: 18px; width: min(420px, 100%); display: flex; flex-direction: column; gap: 12px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.25); }
+.sheet h3 { margin: 0; font-size: 18px; }
+.sheet p { margin: 0; color: var(--muted); }
+.sheet textarea { min-height: 90px; resize: vertical; }
+.bgs { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.bgs label { border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.bgs label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.actions { display: flex; gap: 8px; justify-content: flex-start; flex-wrap: wrap; }
+.note { font-size: 13px; color: var(--muted); }
+</style>
+
+<div id="app">
+  <header class="bar">
+    <select id="drawing" aria-label="טיוטה"></select>
+    <button id="btnNew" title="טיוטה חדשה">+ טיוטה</button>
+    <button id="btnSave" class="primary">שמור גרסה</button>
+    <button id="btnMore" aria-expanded="false" aria-controls="more">עוד</button>
+    <span id="status" role="status">טוען…</span>
+  </header>
+  <div id="board">
+    <div id="canvas"></div>
+    <div id="empty" hidden></div>
+    <div id="measure" hidden></div>
+
+    <aside id="more" class="panel" hidden aria-label="פרטי הטיוטה">
+      <div class="row"><b style="flex:1">הטיוטה</b><button id="btnClose">סגור</button></div>
+      <section>
+        <h2>שם</h2>
+        <div class="row"><input type="text" id="title" aria-label="שם הטיוטה"><button id="btnRename">שמור שם</button></div>
+      </section>
+      <section>
+        <h2>רקע</h2>
+        <select id="bgSel" aria-label="רקע"></select>
+        <label class="row">בהירות הרקע <input type="range" id="bgOpacity" min="10" max="100" step="5" value="60" style="flex:1"></label>
+      </section>
+      <section>
+        <h2>גרסאות</h2>
+        <div id="versions" class="vlist"></div>
+      </section>
+      <section>
+        <h2>פעולות</h2>
+        <div class="actions">
+          <button id="btnExport">תמונה לאדריכל</button>
+          <button id="btnDup">שכפל לטיוטה חדשה</button>
+          <button id="btnDelete" class="danger">מחק טיוטה</button>
+        </div>
+      </section>
+      <section>
+        <h2>איך מציירים</h2>
+        <ul class="help">
+          <li><b>ציור חופשי:</b> העיפרון בסרגל הכלים. עם עט בטלפון מציירים ישר על המסך.</li>
+          <li><b>אובייקטים:</b> כפתור הספרייה (סמל הספר) פותח מיטות, ספות, דלתות, חלונות, מטבח, אמבטיה ועוד, בגודל אמיתי. גוררים למקום.</li>
+          <li><b>חדר:</b> כלי המלבן. כשמסמנים צורה, המידות והשטח מופיעים למעלה.</li>
+          <li><b>הערה:</b> כלי הטקסט או חץ. אפשר גם לכתוב בשמירת הגרסה מה התכוונת.</li>
+          <li><b>קנה המידה:</b> משבצת ברשת היא חצי מטר. הרקע נעול.</li>
+          <li>כל שינוי נשמר בטיוטה מעצמו. <b>שמור גרסה</b> שומר נקודה קבועה, ואותה Claude קורא.</li>
+        </ul>
+      </section>
+    </aside>
+
+    <div id="shade" class="shade" hidden>
+      <form id="sheetNew" class="sheet" hidden>
+        <h3>טיוטה חדשה</h3>
+        <input type="text" id="newTitle" aria-label="שם" placeholder="למשל: מטבח פתוח לגינה">
+        <div class="bgs" id="newBgs"></div>
+        <div class="actions"><button type="submit" class="primary">צור</button><button type="button" data-close>ביטול</button></div>
+      </form>
+      <form id="sheetSave" class="sheet" hidden>
+        <h3>שמירת גרסה</h3>
+        <p>מה השתנה, ולמה התכוונת? Claude יקרא את זה עם השרטוט.</p>
+        <textarea id="saveNote" aria-label="הערה לגרסה"></textarea>
+        <div class="actions"><button type="submit" class="primary">שמור</button><button type="button" data-close>ביטול</button></div>
+      </form>
+      <form id="sheetDelete" class="sheet" hidden>
+        <h3>למחוק את הטיוטה?</h3>
+        <p id="delText"></p>
+        <div class="actions"><button type="submit" class="danger">מחק לצמיתות</button><button type="button" data-close>ביטול</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script>window.EXCALIDRAW_ASSET_PATH = "https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/";</script>
+<script src="https://unpkg.com/@excalidraw/excalidraw@0.17.6/dist/excalidraw.production.min.js"></script>
+<script>
+"use strict";
+// Backgrounds, written by build_sketch.py: the empty plot and the models, in board pixels (1 m = 50 px, plot coordinates).
+const BG = /*__BACKGROUNDS__*/{};
+const PX = 50;
+const CHUNK = 200000;          // a db document holds 256 KiB; elements are split into chunks below that
+const E = window.ExcalidrawLib;
+const h = React.createElement;
+const $ = (id) => document.getElementById(id);
+
+let db = null, assets = null, downloads = null;
+let drawings = [];             // [{id, title, bg, updated, versions}]
+let cur = null;                // the open drawing id
+let api = null, root = null;
+let loadedSig = 0, savedSig = 0, saveTimer = null, saving = Promise.resolve(), workN = {};
+let lastMeasure = "";
+
+// ---- status -----------------------------------------------------------------------------------
+function status(text, err) { const s = $("status"); s.textContent = text; s.classList.toggle("err", !!err); }
+const fmtDate = (ts) => new Date(ts).toLocaleString("he-IL", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+
+// ---- the object library, in real size --------------------------------------------------------
+function lib() {
+  const m = (v) => v * PX;
+  const R = (x, y, w, hh, o = {}) => ({ type: "rectangle", x: m(x), y: m(y), width: m(w), height: m(hh), ...o });
+  const O = (x, y, w, hh, o = {}) => ({ type: "ellipse", x: m(x), y: m(y), width: m(w), height: m(hh), ...o });
+  const L = (pts, o = {}) => ({ type: "line", x: m(pts[0][0]), y: m(pts[0][1]),
+    points: pts.map(([a, b]) => [m(a - pts[0][0]), m(b - pts[0][1])]), ...o });
+  const T = (x, y, text, size = 14) => ({ type: "text", x: m(x), y: m(y), text, fontSize: size, fontFamily: 2 });
+  const arc = (r) => { const p = []; for (let i = 0; i <= 12; i++) { const a = (Math.PI / 2) * i / 12; p.push([r * Math.sin(a), r * Math.cos(a)]); } return p; };
+  const items = {
+    "דלת 90": [R(0, 0, 0.9, 0.12, { backgroundColor: "#ffffff", fillStyle: "solid", strokeColor: "transparent" }), L([[0, 0], [0, 0.9]]), L(arc(0.9).map(([a, b]) => [a, b]), { strokeStyle: "dashed" })],
+    "דלת 80": [R(0, 0, 0.8, 0.12, { backgroundColor: "#ffffff", fillStyle: "solid", strokeColor: "transparent" }), L([[0, 0], [0, 0.8]]), L(arc(0.8), { strokeStyle: "dashed" })],
+    "דלת הזזה 2.4": [R(0, 0, 2.4, 0.25), L([[0, 0.09], [1.3, 0.09]]), L([[1.1, 0.16], [2.4, 0.16]])],
+    "חלון 1.2": [R(0, 0, 1.2, 0.25), L([[0, 0.125], [1.2, 0.125]])],
+    "חלון 2.0": [R(0, 0, 2.0, 0.25), L([[0, 0.125], [2.0, 0.125]])],
+    "מיטה זוגית 160": [R(0, 0, 1.6, 2.0), R(0.1, 0.08, 0.65, 0.35), R(0.85, 0.08, 0.65, 0.35), L([[0, 0.6], [1.6, 0.6]])],
+    "מיטת יחיד 90": [R(0, 0, 0.9, 2.0), R(0.12, 0.08, 0.66, 0.35), L([[0, 0.6], [0.9, 0.6]])],
+    "ארון 2.0": [R(0, 0, 2.0, 0.6), L([[0, 0.6], [2.0, 0]])],
+    "ספה 2.2": [R(0, 0, 2.2, 0.9), R(0, 0, 2.2, 0.22), R(0, 0.22, 0.2, 0.68), R(2.0, 0.22, 0.2, 0.68)],
+    "ספה פינתית": [R(0, 0, 2.6, 0.9), R(0, 0.9, 0.9, 1.3), L([[0, 0.22], [2.6, 0.22]]), L([[0.22, 0.22], [0.22, 2.2]])],
+    "כורסה": [R(0, 0, 0.85, 0.85), R(0, 0, 0.85, 0.2)],
+    "שולחן אוכל 6": [R(0.45, 0.5, 1.8, 0.9), R(0.6, 0, 0.45, 0.45), R(1.125, 0, 0.45, 0.45), R(1.65, 0, 0.45, 0.45),
+      R(0.6, 1.45, 0.45, 0.45), R(1.125, 1.45, 0.45, 0.45), R(1.65, 1.45, 0.45, 0.45)],
+    "שולחן עבודה": [R(0, 0, 1.4, 0.7), O(0.47, 0.8, 0.46, 0.46)],
+    "משטח מטבח 2.4": [R(0, 0, 2.4, 0.6, { backgroundColor: "#eeeae2", fillStyle: "solid" })],
+    "כיור מטבח": [R(0, 0, 0.8, 0.6), R(0.08, 0.08, 0.64, 0.42)],
+    "כיריים": [R(0, 0, 0.6, 0.6), O(0.06, 0.06, 0.2, 0.2), O(0.34, 0.06, 0.2, 0.2), O(0.06, 0.34, 0.2, 0.2), O(0.34, 0.34, 0.2, 0.2)],
+    "מקרר": [R(0, 0, 0.75, 0.7), T(0.14, 0.24, "מקרר")],
+    "אסלה": [R(0, 0, 0.42, 0.18), O(0.02, 0.16, 0.38, 0.5)],
+    "כיור רחצה": [R(0, 0, 0.6, 0.45), O(0.1, 0.08, 0.4, 0.3)],
+    "מקלחת 90": [R(0, 0, 0.9, 0.9), L([[0, 0], [0.9, 0.9]]), L([[0.9, 0], [0, 0.9]])],
+    "אמבטיה": [R(0, 0, 1.7, 0.75), R(0.08, 0.08, 1.54, 0.59, { roundness: { type: 3 } })],
+    "מכונת כביסה": [R(0, 0, 0.6, 0.6), O(0.1, 0.1, 0.4, 0.4)],
+    "מדרגות 1.0": [R(0, 0, 1.0, 3.08), ...Array.from({ length: 10 }, (_, i) => L([[0, 0.28 * (i + 1)], [1.0, 0.28 * (i + 1)]])),
+      { type: "arrow", x: m(0.5), y: m(2.9), points: [[0, 0], [0, -m(2.7)]] }],
+    "רכב": [R(0, 0, 1.8, 4.5, { roundness: { type: 3 } }), L([[0.15, 1.3], [1.65, 1.3]])],
+    "עץ": [O(0, 0, 3, 3, { strokeColor: "#3d7a4a", strokeStyle: "dashed" }), O(1.35, 1.35, 0.3, 0.3, { strokeColor: "#3d7a4a" })],
+    "אדם (לקנה מידה)": [O(0, 0, 0.5, 0.3), O(0.15, 0.04, 0.2, 0.22)],
+  };
+  const base = { strokeColor: "#1d1d1b", backgroundColor: "transparent", strokeWidth: 1, roughness: 0 };
+  return Object.entries(items).map(([name, sk], i) => {
+    const gid = "lib-g" + i;
+    const els = E.convertToExcalidrawElements(sk.map((s) => ({ ...base, ...s })));
+    return { id: "lib-" + i, status: "unpublished", created: 1, name, elements: els.map((e) => ({ ...e, groupIds: [gid] })) };
+  });
+}
+
+// ---- elements: background, compaction, signatures --------------------------------------------
+function bgElement(key, opacity) {
+  const b = BG[key];
+  if (!b) return null;
+  const [el] = E.convertToExcalidrawElements([{ type: "image", fileId: "bg-" + key, x: b.x, y: b.y, width: b.w, height: b.h }]);
+  return { ...el, id: "bg", locked: true, opacity, status: "saved", customData: { bg: key } };
+}
+function filesFor(elements) {
+  const files = {};
+  for (const el of elements) if (el.type === "image" && el.customData && BG[el.customData.bg]) {
+    const k = el.customData.bg;
+    files["bg-" + k] = { id: "bg-" + k, mimeType: "image/svg+xml", dataURL: BG[k].dataURL, created: 1 };
+  }
+  return files;
+}
+const r1 = (v) => Math.round(v * 10) / 10;
+function compact(elements) {
+  return elements.filter((e) => !e.isDeleted).map((e) => {
+    const o = { ...e };
+    if (o.points) o.points = o.points.map(([a, b]) => [r1(a), r1(b)]);
+    if (o.pressures && !o.simulatePressure) o.pressures = o.pressures.map((p) => Math.round(p * 100) / 100);
+    for (const k of ["x", "y", "width", "height"]) o[k] = r1(o[k]);
+    return o;
+  });
+}
+function chunks(elements) {
+  const out = []; let part = [], size = 0;
+  for (const e of elements) {
+    const s = JSON.stringify(e).length;
+    if (part.length && size + s > CHUNK) { out.push(part); part = []; size = 0; }
+    part.push(e); size += s;
+  }
+  out.push(part);
+  return out;
+}
+const sig = (els) => E.getSceneVersion(els);
+
+// ---- db helpers --------------------------------------------------------------------------------
+const P = {
+  drawing: (d) => `drawings/${d}`,
+  work: (d) => `drawings/${d}/work/current`,
+  versions: (d) => `drawings/${d}/versions`,
+  version: (d, v) => `drawings/${d}/versions/${v}`,
+};
+async function writeChunked(path, head, elements) {
+  const parts = chunks(compact(elements));
+  for (let i = 0; i < parts.length; i++) await db.doc(`${path}/chunks/${i}`).set({ els: parts[i] });
+  await db.doc(path).set({ ...head, chunks: parts.length });
+  return parts.length;
+}
+async function readChunked(path) {
+  const head = await db.doc(path).get();
+  if (!head.exists) return null;
+  const n = head.data().chunks || 0, els = [];
+  for (let i = 0; i < n; i++) {
+    const c = await db.doc(`${path}/chunks/${i}`).get();
+    if (c.exists) els.push(...c.data().els);
+  }
+  return { head: head.data(), elements: els };
+}
+async function deleteChunked(path) {
+  const head = await db.doc(path).get();
+  const n = head.exists ? head.data().chunks || 0 : 0;
+  for (let i = 0; i < n + 2; i++) await db.doc(`${path}/chunks/${i}`).delete();
+  await db.doc(path).delete();
+}
+
+// ---- the board -------------------------------------------------------------------------------
+const LIB = [];
+function mount(elements, key) {
+  $("empty").hidden = true;
+  api = null;
+  const props = {
+    key, langCode: "en", theme: "light",
+    initialData: {
+      elements, files: filesFor(elements), libraryItems: LIB,
+      appState: { gridSize: 25, viewBackgroundColor: "#ffffff", currentItemFontFamily: 2, currentItemRoughness: 0,
+        currentItemStrokeWidth: 1, currentItemStrokeColor: "#1d1d1b" },
+    },
+    excalidrawAPI: (a) => {
+      api = a;
+      // open with the whole drawing on screen (on a phone the plot is otherwise cut to a corner)
+      setTimeout(() => { if (api === a && elements.length) a.scrollToContent(undefined, { fitToViewport: true, viewportZoomFactor: 0.95 }); }, 60);
+    },
+    onChange,
+    UIOptions: { canvasActions: { loadScene: false, saveToActiveFile: false, export: false, saveAsImage: false, toggleTheme: false } },
+  };
+  root.render(h(E.Excalidraw, props));
+  loadedSig = savedSig = sig(elements);
+}
+
+function onChange(elements, appState) {
+  measure(elements, appState);
+  if (!cur || !db) return;
+  const s = sig(elements);
+  if (s === savedSig) return;
+  status("לא נשמר עדיין");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveWork(), 2500);
+}
+
+function measure(elements, appState) {
+  const ids = Object.keys(appState.selectedElementIds || {});
+  let text = "";
+  const sel = elements.filter((e) => ids.includes(e.id) && !e.isDeleted && e.id !== "bg");
+  if (sel.length === 1 && (sel[0].type === "line" || sel[0].type === "arrow")) {
+    const p = sel[0].points; let len = 0;
+    for (let i = 1; i < p.length; i++) len += Math.hypot(p[i][0] - p[i - 1][0], p[i][1] - p[i - 1][1]);
+    text = `אורך ${(len / PX).toFixed(2)} מ'`;
+  } else if (sel.length) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const e of sel) { x0 = Math.min(x0, e.x); y0 = Math.min(y0, e.y); x1 = Math.max(x1, e.x + e.width); y1 = Math.max(y1, e.y + e.height); }
+    const w = (x1 - x0) / PX, d = (y1 - y0) / PX;
+    text = `${w.toFixed(2)} × ${d.toFixed(2)} מ'`;
+    if (sel.length === 1 && sel[0].type === "rectangle") text += ` · ${(w * d).toFixed(1)} מ"ר`;
+  }
+  if (text !== lastMeasure) { lastMeasure = text; $("measure").textContent = text; $("measure").hidden = !text; }
+}
+
+function saveWork() {
+  if (!api || !cur || !db) return saving;
+  const d = cur, els = api.getSceneElements(), s = sig(els);
+  if (s === savedSig) return saving;
+  saving = saving.then(async () => {
+    status("שומר…");
+    try {
+      const prev = workN[d] || 0;
+      const n = await writeChunked(P.work(d), { ts: Date.now() }, els);
+      for (let i = n; i < prev; i++) await db.doc(`${P.work(d)}/chunks/${i}`).delete();
+      workN[d] = n;
+      await db.doc(P.drawing(d)).update({ updated: Date.now() });
+      if (d === cur) savedSig = s;
+      status("נשמר בטיוטה");
+    } catch (e) { status(e.code === "quota_exceeded" ? "המקום במאגר נגמר: מחקו טיוטות ישנות" : "השמירה נכשלה, ננסה שוב בשינוי הבא", true); }
+  });
+  return saving;
+}
+
+async function open(id, opts = {}) {
+  clearTimeout(saveTimer);
+  if (cur && cur !== id) await saveWork();
+  cur = id;
+  try { localStorage.setItem("sketch.cur", id); } catch (e) { /* storage off */ }
+  $("drawing").value = id;
+  const d = drawings.find((x) => x.id === id);
+  status("טוען…");
+  let els = null;
+  const work = await readChunked(P.work(id));
+  if (work) { els = work.elements; workN[id] = work.head.chunks; }
+  if (!els) { const bg = d && bgElement(d.bg, 60); els = bg ? [bg] : []; }
+  mount(els, id + ":" + Date.now());
+  status(work ? "נטען" : "טיוטה חדשה");
+  if (!$("more").hidden) fillPanel();
+}
+
+// ---- drafts list -------------------------------------------------------------------------------
+function renderList() {
+  const s = $("drawing");
+  s.replaceChildren(...drawings.map((d) => { const o = document.createElement("option"); o.value = d.id; o.textContent = d.title; return o; }));
+  if (cur) s.value = cur;
+  const none = !drawings.length;
+  for (const b of ["btnSave", "btnMore"]) $(b).disabled = none;
+  s.disabled = none;
+  if (none) {
+    root.render(null); cur = null;
+    $("empty").hidden = false;
+    $("empty").innerHTML = "<div><p style='font-size:18px;margin:0 0 8px;color:var(--ink)'>עוד אין טיוטות.</p><p style='margin:0'>לחצו <b>+ טיוטה</b>, בחרו רקע (המגרש הריק או אחד הדגמים), והתחילו לצייר.</p></div>";
+  }
+}
+
+// the list snapshot may already hold a new drawing; add it only if it is not there yet
+function addLocal(d) { if (!drawings.some((x) => x.id === d.id)) drawings.unshift(d); renderList(); }
+
+function newId() { return "d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+async function createDrawing(title, bg, elements) {
+  const id = newId(), now = Date.now();
+  await db.doc(P.drawing(id)).set({ title, bg, created: now, updated: now, versions: 0 });
+  if (elements) { workN[id] = await writeChunked(P.work(id), { ts: now }, elements); }
+  return id;
+}
+
+// ---- versions ----------------------------------------------------------------------------------
+async function snapshotPng(scale) {
+  const els = api.getSceneElements().filter((e) => !e.isDeleted);
+  return E.exportToBlob({ elements: els, files: api.getFiles(), mimeType: "image/png", exportPadding: 24,
+    appState: { exportBackground: true, viewBackgroundColor: "#ffffff", exportWithDarkMode: false, exportScale: scale } });
+}
+
+async function saveVersion(note) {
+  if (!api || !cur) return;
+  const d = cur, dr = drawings.find((x) => x.id === d);
+  await saveWork();
+  status("שומר גרסה…");
+  try {
+    const n = (dr.versions || 0) + 1, vid = "v" + String(n).padStart(3, "0");
+    let png = null, pngUrl = null;
+    if (assets) {
+      try { const blob = await snapshotPng(1); const a = await assets.upload(blob); png = a.id; pngUrl = a.url; }
+      catch (e) { /* the drawing itself still saves */ }
+    }
+    await writeChunked(P.version(d, vid), { n, ts: Date.now(), note, png, pngUrl }, api.getSceneElements());
+    await db.doc(P.drawing(d)).update({ versions: n, updated: Date.now() });
+    status(`נשמרה גרסה ${n}`);
+  } catch (e) { status("שמירת הגרסה נכשלה", true); }
+}
+
+async function listVersions(d) {
+  const q = await db.collection(P.versions(d)).orderBy("n", "desc").get();
+  return q.docs.map((x) => ({ id: x.id, ...x.data() }));
+}
+
+async function loadVersion(d, vid) {
+  const v = await readChunked(P.version(d, vid));
+  if (!v) return;
+  mount(v.elements, d + ":" + vid + ":" + Date.now());
+  savedSig = -1;               // the loaded version becomes the working copy
+  await saveWork();
+  status(`נטענה גרסה ${v.head.n}`);
+}
+
+async function deleteDrawing(d) {
+  status("מוחק…");
+  const vs = await listVersions(d);
+  for (const v of vs) {
+    if (v.png && assets) { try { await assets.delete(v.png); } catch (e) { /* already gone */ } }
+    await deleteChunked(P.version(d, v.id));
+  }
+  await deleteChunked(P.work(d));
+  await db.doc(P.drawing(d)).delete();
+  cur = null;
+  status("הטיוטה נמחקה");
+}
+
+// ---- panel ------------------------------------------------------------------------------------
+async function fillPanel() {
+  const d = drawings.find((x) => x.id === cur);
+  if (!d) return;
+  $("title").value = d.title;
+  const bgSel = $("bgSel");
+  bgSel.replaceChildren(...[["none", "בלי רקע"], ...Object.entries(BG).map(([k, b]) => [k, b.label])].map(([k, l]) => {
+    const o = document.createElement("option"); o.value = k; o.textContent = l; return o;
+  }));
+  const bgEl = api && api.getSceneElements().find((e) => e.id === "bg");
+  bgSel.value = bgEl ? bgEl.customData.bg : "none";
+  if (bgEl) $("bgOpacity").value = bgEl.opacity;
+  const box = $("versions");
+  box.textContent = "טוען…";
+  const vs = await listVersions(cur);
+  if (!vs.length) { box.innerHTML = "<p class='note'>עוד אין גרסאות. <b>שמור גרסה</b> שומר נקודה קבועה שאפשר לחזור אליה.</p>"; return; }
+  box.replaceChildren(...vs.map((v) => {
+    const row = document.createElement("div"); row.className = "ver";
+    const img = document.createElement("img"); img.alt = ""; if (v.pngUrl) img.src = v.pngUrl;
+    const t = document.createElement("div"); t.className = "t";
+    const b = document.createElement("b"); b.textContent = `גרסה ${v.n}`;
+    const when = document.createElement("div"); when.textContent = fmtDate(v.ts);
+    const note = document.createElement("div"); note.textContent = v.note || "";
+    t.append(b, when, note);
+    const btn = document.createElement("button"); btn.textContent = "פתח";
+    btn.onclick = () => loadVersion(cur, v.id);
+    row.append(img, t, btn);
+    return row;
+  }));
+}
+
+function setBackground(key, opacity) {
+  if (!api) return;
+  const els = api.getSceneElements().filter((e) => e.id !== "bg");
+  const bg = key !== "none" ? bgElement(key, opacity) : null;
+  if (bg) api.addFiles(Object.values(filesFor([bg])));
+  api.updateScene({ elements: bg ? [bg, ...els] : els });
+}
+
+// ---- sheets -------------------------------------------------------------------------------------
+function sheet(id) {
+  $("shade").hidden = !id;
+  for (const s of ["sheetNew", "sheetSave", "sheetDelete"]) $(s).hidden = s !== id;
+  const f = id && $(id).querySelector("input[type=text], textarea");
+  if (f) setTimeout(() => f.focus(), 30);
+}
+
+function wire() {
+  $("drawing").onchange = (e) => open(e.target.value);
+  $("btnNew").onclick = () => {
+    $("newTitle").value = "";
+    const box = $("newBgs");
+    box.replaceChildren(...[...Object.entries(BG).map(([k, b]) => [k, b.label]), ["none", "בלי רקע"]].map(([k, l], i) => {
+      const lab = document.createElement("label");
+      const r = document.createElement("input"); r.type = "radio"; r.name = "newBg"; r.value = k; r.id = "newBg-" + k; r.checked = i === 0;
+      lab.append(r, document.createTextNode(l));
+      return lab;
+    }));
+    sheet("sheetNew");
+  };
+  $("sheetNew").onsubmit = async (e) => {
+    e.preventDefault();
+    const bg = (document.querySelector("input[name=newBg]:checked") || {}).value || "plot";
+    const title = $("newTitle").value.trim() || `טיוטה ${drawings.length + 1}`;
+    sheet(null);
+    if (!db) return;
+    const id = await createDrawing(title, bg, null);
+    addLocal({ id, title, bg, updated: Date.now(), versions: 0 });
+    open(id);
+  };
+  $("btnSave").onclick = () => { $("saveNote").value = ""; sheet("sheetSave"); };
+  $("sheetSave").onsubmit = (e) => { e.preventDefault(); const note = $("saveNote").value.trim(); sheet(null); saveVersion(note).then(() => { if (!$("more").hidden) fillPanel(); }); };
+  $("btnDelete").onclick = () => {
+    const d = drawings.find((x) => x.id === cur);
+    $("delText").textContent = `"${d.title}" וכל ${d.versions || 0} הגרסאות שלה יימחקו. אי אפשר לבטל.`;
+    sheet("sheetDelete");
+  };
+  $("sheetDelete").onsubmit = async (e) => { e.preventDefault(); sheet(null); $("more").hidden = true; await deleteDrawing(cur); };
+  for (const b of document.querySelectorAll("[data-close]")) b.onclick = () => sheet(null);
+  $("shade").onclick = (e) => { if (e.target === $("shade")) sheet(null); };
+  $("btnMore").onclick = () => { const m = $("more"); m.hidden = !m.hidden; $("btnMore").setAttribute("aria-expanded", String(!m.hidden)); if (!m.hidden) fillPanel(); };
+  $("btnClose").onclick = () => { $("more").hidden = true; $("btnMore").setAttribute("aria-expanded", "false"); };
+  $("btnRename").onclick = async () => {
+    const t = $("title").value.trim(); if (!t || !cur) return;
+    await db.doc(P.drawing(cur)).update({ title: t });
+    status("השם נשמר");
+  };
+  $("bgSel").onchange = (e) => setBackground(e.target.value, +$("bgOpacity").value);
+  $("bgOpacity").oninput = (e) => { const v = $("bgSel").value; if (v !== "none") setBackground(v, +e.target.value); };
+  $("btnDup").onclick = async () => {
+    const d = drawings.find((x) => x.id === cur);
+    await saveWork();
+    const els = api.getSceneElements().filter((x) => !x.isDeleted);
+    const id = await createDrawing(d.title + " (עותק)", d.bg, els);
+    addLocal({ id, title: d.title + " (עותק)", bg: d.bg, updated: Date.now(), versions: 0 });
+    open(id);
+  };
+  $("btnExport").onclick = async () => {
+    if (!downloads) { status("ייצוא לא זמין בתצוגה הזו", true); return; }
+    try {
+      const d = drawings.find((x) => x.id === cur);
+      const blob = await snapshotPng(2);
+      await downloads.save({ filename: `${d.title}.png`, data: blob });
+    } catch (e) { if (e && e.code !== "cancelled") status("הייצוא לא הושלם", true); }
+  };
+  document.addEventListener("visibilitychange", () => { if (document.hidden) saveWork(); });
+}
+
+// ---- start --------------------------------------------------------------------------------------
+async function start() {
+  root = ReactDOM.createRoot($("canvas"));
+  LIB.push(...lib());
+  wire();
+  db = await claude.use("db");
+  [assets, downloads] = await Promise.all([claude.use("assets"), claude.use("downloads")]);
+  if (!db) {
+    status("השמירה לא זמינה כאן: אפשר לצייר, אבל שום דבר לא נשמר", true);
+    $("btnSave").disabled = true;
+    mount([bgElement("plot", 60)], "local");
+    return;
+  }
+  db.collection("drawings").onSnapshot((snap) => {
+    drawings = snap.docs.map((x) => ({ id: x.id, ...x.data() })).sort((a, b) => (b.updated || 0) - (a.updated || 0));
+    renderList();
+    if (!cur || !drawings.some((x) => x.id === cur)) {
+      let want = null;
+      try { want = localStorage.getItem("sketch.cur"); } catch (e) { /* storage off */ }
+      const pick = drawings.find((x) => x.id === want) || drawings[0];
+      if (pick) open(pick.id);
+    }
+  }, () => status("הקשר למאגר נותק. רעננו את הדף.", true));
+}
+if (window.claude && window.claude.use) start();
+else { root = ReactDOM.createRoot($("canvas")); LIB.push(...lib()); mount([bgElement("plot", 60)], "local"); status("תצוגה בלבד: השמירה פועלת רק ב-claude.ai", true); }
+</script>
